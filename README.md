@@ -18,6 +18,8 @@ or visual design.
   [`simple-app-update-server`](https://github.com/kzahel/simple-app-update-server).
 - Release configuration and draft-finalization validators.
 - A real old-to-new [testbed acceptance runbook](docs/canary-testbed-runbook.md).
+- Redacted evidence from the latest
+  [`0.1.0 -> 0.1.1` acceptance campaign](docs/evidence/desktop-v0.1.0-to-v0.1.1.md).
 
 The generic server stays separate. Each consuming product continues to own its
 branding, lifecycle, product UI, release tag, endpoint route, and updater key.
@@ -58,8 +60,12 @@ that the complete installed application was replaced.
 For a local bundled smoke test:
 
 ```bash
-pnpm tauri build --debug --bundles app
+pnpm tauri build --debug --bundles app --no-sign
 ```
+
+The local smoke build deliberately skips signing because release credentials
+remain in GitHub Actions. Only the tagged workflow establishes signing,
+notarization, and updater-artifact evidence.
 
 ## Release invariants
 

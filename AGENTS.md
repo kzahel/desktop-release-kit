@@ -31,7 +31,7 @@ pnpm check
 cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
-pnpm tauri build --debug --bundles app
+pnpm tauri build --debug --bundles app --no-sign
 ```
 
 Cross-platform packaging, signing, installation, updater, and relaunch claims

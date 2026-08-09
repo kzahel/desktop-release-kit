@@ -5,6 +5,9 @@ Windows, and Linux testbeds. The repository owns product assertions; the
 standalone testbed repositories own VM lifecycle, transport, UI automation,
 screenshots, and recovery.
 
+The latest completed campaign is the
+[`desktop-v0.1.0 -> desktop-v0.1.1` evidence record](evidence/desktop-v0.1.0-to-v0.1.1.md).
+
 ## Preconditions
 
 - Both versions are public, finalized `desktop-v*` GitHub releases.

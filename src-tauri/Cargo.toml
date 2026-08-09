@@ -1,0 +1,37 @@
+[package]
+name = "desktop-release-canary"
+version = "0.1.0"
+description = "Signed desktop update infrastructure canary"
+authors = ["Kyle Graehl <kgraehl@gmail.com>"]
+edition = "2021"
+default-run = "desktop-release-canary"
+
+[lib]
+name = "desktop_release_canary_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "desktop-release-canary"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+dirs = "6"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = ["image-png"] }
+tauri-plugin-process = "2"
+tauri-plugin-updater = "2"
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "warn"
+pedantic = "warn"

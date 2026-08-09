@@ -1,0 +1,9 @@
+{
+  "id": "desktop-release-canary",
+  "displayName": "Desktop Release Canary",
+  "hostnames": ["updates.graehlarts.com"],
+  "pathPrefix": "/canary",
+  "githubRepo": "kzahel/desktop-release-kit",
+  "tagPrefix": "desktop-v",
+  "tauriUpdates": true
+}

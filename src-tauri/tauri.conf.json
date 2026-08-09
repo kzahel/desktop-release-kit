@@ -1,0 +1,65 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Desktop Release Canary",
+  "mainBinaryName": "desktop-release-canary",
+  "version": "0.1.0",
+  "identifier": "com.kzahel.desktop-release-canary",
+  "build": {
+    "beforeDevCommand": "pnpm prepare-sidecar && pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm prepare-sidecar && pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Desktop Release Canary",
+        "width": 980,
+        "height": 760,
+        "minWidth": 720,
+        "minHeight": 620,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self'; img-src 'self' data:; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": true,
+    "targets": "all",
+    "externalBin": ["binaries/canary-sidecar"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "DeveloperTool",
+    "shortDescription": "Signed desktop update infrastructure canary",
+    "longDescription": "Reference application for validating cross-platform signed packaging and automatic updates.",
+    "macOS": {
+      "minimumSystemVersion": "13.0",
+      "signingIdentity": "Developer ID Application: Kyle Graehl (VD7BYQ6ABM)"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      },
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://updates.graehlarts.com/canary/tauri/{{target}}/{{arch}}/{{current_version}}"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM4NUNFMEMxOUY4NDgzQkIKUldTN2c0U2Z3ZUJjeUQzQjlTZmhMUXE1bXVJajVLZXlLQzJPZzZLTElUU1lzcE5OVURyOXVWN3kK"
+    }
+  }
+}

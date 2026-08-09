@@ -107,11 +107,15 @@ Failures retain an appropriate retry path.
 
 ## Package ownership
 
-In-app installation is allowed for packages whose replacement Tauri owns:
+The default profile is the least-privileged, self-contained package that the
+application can replace without administrator access:
 
-- macOS `.app` update artifact
-- Windows NSIS installation
-- Linux AppImage
+- macOS: distribute a DMG for initial installation, run the contained `.app`,
+  and update it from the signed `.app.tar.gz` artifact.
+- Windows: use a per-user NSIS installation and its signed setup executable for
+  updates.
+- Linux: keep an AppImage in a stable user-writable location and replace that
+  AppImage during updates.
 
 System package channels stay with their package manager:
 
@@ -121,6 +125,24 @@ System package channels stay with their package manager:
 
 Those installations show a manual-download/package-channel path instead of
 attempting in-app replacement.
+
+Some applications need an integrated macOS profile. A signed PKG is justified
+when initial installation must register a native-messaging host, helper, or
+other resource outside the application bundle. Prefer user-scoped destinations
+that do not require administrator access. The product must explicitly define
+who owns every external resource and how it stays compatible across updates:
+
+- Prefer a stable external manifest that points to a binary inside the `.app`;
+  the PKG then performs initial registration while normal `.app` updates replace
+  the executable.
+- If the PKG copies a separately versioned executable outside the `.app`, the
+  product must update it through a PKG or an explicit migration/repair step.
+- Never claim the self-contained update path also updated an external component
+  unless installed-version evidence proves it.
+
+The canary accepts the self-contained profile. JSTorrent is the reference for
+the integrated macOS profile; a product adopts that exception deliberately
+rather than making privileged installation the shared default.
 
 ## Release artifact matrix
 

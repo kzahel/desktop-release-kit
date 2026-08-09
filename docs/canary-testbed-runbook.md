@@ -35,9 +35,19 @@ For both versions, record:
 - `latest.json` version, target URL, and signature presence
 - Testbed image/snapshot identity
 
-Use App/DMG on macOS, NSIS on Windows, and AppImage on Linux for the in-app
-update path. MSI, DEB, and RPM validate the manual package-ownership behavior
-separately.
+Use the least-privileged self-contained profile for this campaign:
+
+- macOS: install from the DMG by copying its App to `/Applications`; the
+  in-app update consumes the signed `.app.tar.gz` artifact.
+- Windows: install the per-user NSIS setup executable and update through NSIS.
+- Linux: place the AppImage in a stable user-writable location and update that
+  AppImage in place.
+
+MSI, DEB, and RPM validate the manual package-ownership behavior separately.
+The canary does not manufacture a reason to use a macOS PKG. Applications such
+as JSTorrent may use the integrated PKG profile when they must register an
+external native host, but they must separately prove that external component's
+cross-version behavior.
 
 ## Per-platform update sequence
 

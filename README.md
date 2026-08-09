@@ -76,6 +76,12 @@ The finalizer also requires the normal DMG, MSI, DEB, and RPM installer matrix,
 checks every updater URL and detached signature, writes `SHA256SUMS`, removes
 redundant detached signature assets after validation, and only then publishes.
 
+The canary's default installed path is deliberately non-privileged: DMG to App
+on macOS, per-user NSIS on Windows, and an AppImage in a user-writable location
+on Linux. Products that must register resources outside their macOS App bundle
+may deliberately use the contract's integrated PKG profile; that is a product
+capability exception, not the shared default.
+
 Tagged releases require:
 
 - A unique Tauri updater key and passphrase

@@ -97,7 +97,12 @@ export function App() {
           <span>✓</span>
         </div>
         <div>
-          <p className="eyebrow">Desktop release infrastructure</p>
+          <div className="hero-labels">
+            <p className="eyebrow">Desktop release infrastructure</p>
+            <span className="acceptance-build">
+              {facts ? `${facts.version} acceptance build` : "Acceptance build"}
+            </span>
+          </div>
           <h1>Canary control panel</h1>
           <p className="lede">
             A deliberately small application that exercises signed packaging,

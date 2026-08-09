@@ -1,6 +1,6 @@
 [package]
 name = "canary-sidecar"
-version = "0.1.0"
+version = "0.1.1"
 description = "Nested build-identity probe for Desktop Release Canary"
 authors = ["Kyle Graehl <kgraehl@gmail.com>"]
 edition = "2021"

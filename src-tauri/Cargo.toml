@@ -1,6 +1,6 @@
 [package]
 name = "desktop-release-canary"
-version = "0.1.0"
+version = "0.1.1"
 description = "Signed desktop update infrastructure canary"
 authors = ["Kyle Graehl <kgraehl@gmail.com>"]
 edition = "2021"

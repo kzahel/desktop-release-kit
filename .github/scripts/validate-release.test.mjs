@@ -36,6 +36,7 @@ function fixture() {
     release: {
       tagName: tag,
       isDraft: true,
+      isPrerelease: false,
       assets: [...names].map((name) => ({ name, digest })),
     },
     latest: {
@@ -54,25 +55,38 @@ function fixture() {
 }
 
 test("accepts a complete five-target draft", () => {
-  assert.equal(validateRelease({ ...fixture(), tag, repository }).version, version);
+  assert.equal(
+    validateRelease({ ...fixture(), tag, repository }).version,
+    version,
+  );
 });
 
 test("rejects an already-public release", () => {
   const data = fixture();
   data.release.isDraft = false;
-  assert.throws(() => validateRelease({ ...data, tag, repository }), /remain a draft/);
+  assert.throws(
+    () => validateRelease({ ...data, tag, repository }),
+    /remain a draft/,
+  );
 });
 
 test("rejects missing platform coverage", () => {
   const data = fixture();
   delete data.latest.platforms["linux-aarch64"];
-  assert.throws(() => validateRelease({ ...data, tag, repository }), /missing platform linux-aarch64/);
+  assert.throws(
+    () => validateRelease({ ...data, tag, repository }),
+    /missing platform linux-aarch64/,
+  );
 });
 
 test("rejects updater URLs outside the tagged release", () => {
   const data = fixture();
-  data.latest.platforms["windows-x86_64"].url = "https://example.test/canary.exe";
-  assert.throws(() => validateRelease({ ...data, tag, repository }), /unexpected URL/);
+  data.latest.platforms["windows-x86_64"].url =
+    "https://example.test/canary.exe";
+  assert.throws(
+    () => validateRelease({ ...data, tag, repository }),
+    /unexpected URL/,
+  );
 });
 
 test("rejects a package-manager artifact as the Linux updater", () => {
@@ -83,11 +97,46 @@ test("rejects a package-manager artifact as the Linux updater", () => {
     name: `desktop-release-canary_${version}_amd64.deb.sig`,
     digest,
   });
-  assert.throws(() => validateRelease({ ...data, tag, repository }), /must use \.AppImage/);
+  assert.throws(
+    () => validateRelease({ ...data, tag, repository }),
+    /must use \.AppImage/,
+  );
 });
 
 test("rejects a release without GitHub asset digests", () => {
   const data = fixture();
   data.release.assets[0].digest = null;
-  assert.throws(() => validateRelease({ ...data, tag, repository }), /missing a GitHub SHA-256 digest/);
+  assert.throws(
+    () => validateRelease({ ...data, tag, repository }),
+    /missing a GitHub SHA-256 digest/,
+  );
+});
+
+test("accepts Latest only with its exact prerelease policy", () => {
+  const data = fixture();
+  const previewTag = `desktop-latest-v${version}`;
+  data.release.tagName = previewTag;
+  for (const platform of Object.values(data.latest.platforms))
+    platform.url = platform.url.replace(tag, previewTag);
+  assert.throws(
+    () => validateRelease({ ...data, tag: previewTag, repository }),
+    /prerelease flag/,
+  );
+  data.release.isPrerelease = true;
+  assert.equal(
+    validateRelease({ ...data, tag: previewTag, repository }).version,
+    version,
+  );
+});
+
+test("rejects a mismatched installer version", () => {
+  const data = fixture();
+  data.release.assets[0].name = data.release.assets[0].name.replace(
+    version,
+    "9.9.9",
+  );
+  assert.throws(
+    () => validateRelease({ ...data, tag, repository }),
+    /does not match release version/,
+  );
 });

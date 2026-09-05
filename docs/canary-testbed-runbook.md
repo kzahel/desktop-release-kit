@@ -2,7 +2,7 @@
 
 Use this runbook to establish a real signed `N -> N+1` update on the macOS,
 Windows, and Linux testbeds. The repository owns product assertions; the
-standalone testbed repositories own VM lifecycle, transport, UI automation,
+common `machine-control` CLI and platform guides own VM lifecycle, transport, UI automation,
 screenshots, and recovery.
 
 The latest completed campaign is the
@@ -20,13 +20,15 @@ The latest completed campaign is the
 From the dotfiles checkout:
 
 ```bash
-python3 ~/code/dotfiles/testbeds/testbeds.py status
-python3 ~/code/dotfiles/testbeds/testbeds.py guide macvm
-python3 ~/code/dotfiles/testbeds/testbeds.py guide winvm
-python3 ~/code/dotfiles/testbeds/testbeds.py guide linuxvm
+~/code/machine-control/bin/machine-control target list
+~/code/machine-control/bin/machine-control --target linux target doctor
+~/code/machine-control/bin/machine-control workspace acquire --help
 ```
 
-Read each provider's authoritative guide before changing VM state.
+Read the common CLI and platform guides, acquire an exclusive claim and an
+isolated workspace, and use target-native administration, semantics, and
+capture. Release the workspace and claim when finished. Private inventories
+select concrete targets; keep those values out of public evidence.
 
 ## Freeze the exact candidates
 
@@ -95,3 +97,27 @@ For each OS, retain:
 Do not describe a platform as accepted because its CI build completed. CI owns
 artifact construction and signing evidence; this campaign owns installed
 behavior and cross-version evidence.
+
+## Stable and Latest campaign
+
+Freeze legacy signed `0.1.1`, new Stable `0.2.0`, and each complete Latest
+release before installing. Record `release-identity.json`, workflow, tag, exact
+source SHA, Linux ARM64 AppImage SHA-256, and updater metadata for each step.
+
+1. Upgrade legacy Stable to `0.2.0` using its existing channel-less request.
+2. Confirm Stable excludes any newer Latest candidate and notes.
+3. Select Latest, verify its saved selection and immediate candidate, and leave
+   it available long enough to establish that checks do not install it.
+4. Explicitly install/relaunch. Require matching native, webview, and sidecar
+   source IDs and the unchanged installation ID.
+5. Push another relevant main change. Require CI to publish a distinct newer
+   Latest without manually creating a release tag, then explicitly update to it.
+6. Select Stable. Require the waiting-for-Stable state and no downgrade. Quit
+   and relaunch to establish persistence.
+7. Deliberately publish Stable `0.4.0`. Check and explicitly install it; require
+   saved Stable, the unchanged installation ID, and all three build IDs matching.
+
+Exercise the deterministic channel/cache/controller/native fixtures alongside
+this installed campaign. Record exactly which installed OS was exercised;
+the complete signed artifact matrix alone does not establish installed passes
+on other platforms.

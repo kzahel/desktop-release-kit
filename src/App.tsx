@@ -11,6 +11,8 @@ function shortId(value: string): string {
 
 function statusCopy(state: UpdaterState): { title: string; body: string } {
   switch (state.phase) {
+    case "waiting-for-stable":
+      return { title: "Waiting for Stable to catch up", body: "Stable is selected. This installed build is newer than the available Stable release and will stay installed until a newer Stable update arrives." };
     case "idle":
       return {
         title: "Update system ready",
@@ -83,6 +85,7 @@ export function App() {
   }, []);
 
   const busy =
+    !updater.ready || updater.selecting ||
     updater.state.phase === "checking" ||
     updater.state.phase === "downloading" ||
     updater.state.phase === "installing";
@@ -112,6 +115,17 @@ export function App() {
         </div>
       </header>
 
+      <section className="panel">
+        <label htmlFor="update-track">Update track </label>
+        <select id="update-track" value={updater.track}
+          disabled={!updater.ready || updater.selecting || updater.state.phase === "downloading" || updater.state.phase === "installing"}
+          onChange={(event) => void updater.select(event.target.value as "stable" | "latest")}>
+          <option value="stable">Stable</option>
+          <option value="latest">Latest</option>
+        </select>
+        <p className="muted">{updater.track === "latest" ? "Latest receives passing CI builds. Checks run every 30 minutes." : "Stable receives deliberate releases. Checks run daily."} Updates install only when you choose Update.</p>
+      </section>
+
       <section className={`status status-${updater.state.phase}`} aria-live="polite">
         <div>
           <p className="status-kicker">Updater state</p>
@@ -125,7 +139,7 @@ export function App() {
             disabled={busy}
             onClick={() => void (canInstall ? updater.install() : updater.check("manual"))}
           >
-            {canInstall ? "Install and relaunch" : busy ? "Working…" : "Check now"}
+            {canInstall ? "Update and relaunch" : busy ? "Working…" : "Check now"}
           </button>
           {updater.state.phase !== "idle" && !busy ? (
             <button type="button" onClick={updater.dismiss}>

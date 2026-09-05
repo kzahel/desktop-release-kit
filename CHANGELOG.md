@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.0]
+
+- Add saved Stable and Latest update tracks with explicit installation.
+- Preserve legacy Stable checks and wait for Stable to catch up after leaving Latest.
+
 ## [0.1.1] - 2026-08-09
 
 - Add an in-app acceptance-build marker for visible replacement evidence.

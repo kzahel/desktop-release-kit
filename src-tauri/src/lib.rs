@@ -1,3 +1,5 @@
+mod channels;
+
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use tauri::{Manager, State};
@@ -14,6 +16,7 @@ struct CanaryState {
 #[serde(rename_all = "camelCase")]
 struct CanaryInfo {
     version: &'static str,
+    build_id: &'static str,
     target: &'static str,
     arch: &'static str,
     installation_id: String,
@@ -92,6 +95,7 @@ fn resolve_sidecar(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 fn get_canary_info(state: State<'_, CanaryState>) -> CanaryInfo {
     CanaryInfo {
         version: env!("CARGO_PKG_VERSION"),
+        build_id: env!("CANARY_BUILD_ID"),
         target: std::env::consts::OS,
         arch: std::env::consts::ARCH,
         installation_id: state.installation_id.clone(),
@@ -128,6 +132,9 @@ fn probe_sidecar(app: tauri::AppHandle) -> Result<SidecarProbe, String> {
             env!("CARGO_PKG_VERSION")
         ));
     }
+    if probe.build_id != env!("CANARY_BUILD_ID") {
+        return Err("Sidecar build ID does not match the native app".into());
+    }
     Ok(probe)
 }
 
@@ -140,7 +147,15 @@ fn probe_sidecar(app: tauri::AppHandle) -> Result<SidecarProbe, String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
-        .invoke_handler(tauri::generate_handler![get_canary_info, probe_sidecar])
+        .invoke_handler(tauri::generate_handler![
+            get_canary_info,
+            probe_sidecar,
+            channels::get_update_channel,
+            channels::set_update_channel,
+            channels::clear_update,
+            channels::check_update,
+            channels::install_update
+        ])
         .setup(|app| {
             let config_dir = app
                 .path()
@@ -151,6 +166,9 @@ pub fn run() {
                 .header("X-CFU-Id", &installation_id)?
                 .build();
             app.handle().plugin(updater)?;
+            app.manage(std::sync::Mutex::new(channels::Updates::new(
+                channels::read_track(&config_dir),
+            )));
             app.manage(CanaryState { installation_id });
             Ok(())
         })

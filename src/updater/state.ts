@@ -1,6 +1,7 @@
 export type CheckReason = "startup" | "periodic" | "manual";
 
 export type UpdaterState =
+  | { phase: "waiting-for-stable" }
   | { phase: "idle"; lastReason?: CheckReason }
   | { phase: "checking"; reason: CheckReason }
   | { phase: "up-to-date"; reason: "manual" }

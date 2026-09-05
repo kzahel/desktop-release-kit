@@ -23,3 +23,17 @@ describe("scheduleAutomaticChecks", () => {
     vi.useRealTimers();
   });
 });
+
+it("replaces the Latest timer when returning to Stable", () => {
+  vi.useFakeTimers();
+  const check = vi.fn();
+  const latest = scheduleAutomaticChecks(check, globalThis, "latest");
+  vi.advanceTimersByTime(30 * 60 * 1000);
+  expect(check.mock.calls).toEqual([["startup"], ["periodic"]]);
+  latest();
+  const stable = scheduleAutomaticChecks(check, globalThis, "stable");
+  vi.advanceTimersByTime(30 * 60 * 1000);
+  expect(check.mock.calls).toEqual([["startup"], ["periodic"], ["startup"]]);
+  stable();
+  vi.useRealTimers();
+});

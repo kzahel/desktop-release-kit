@@ -3,11 +3,27 @@ name: Desktop Canary
 on:
   push:
     branches: [main]
+    paths:
+      - "src/**"
+      - "src-tauri/**"
+      - "scripts/**"
+      - ".github/**"
+      - "update-server/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "vite.config.ts"
+      - "tsconfig*.json"
+      - "CHANGELOG.md"
     tags:
       - "desktop-v*"
   pull_request:
     branches: [main]
   workflow_dispatch:
+
+# Running publication is never cancelled. Obsolete queued main work coalesces.
+concurrency:
+  group: desktop-canary-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -16,7 +32,35 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
+  identity:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.identity.outputs.version }}
+      tag: ${{ steps.identity.outputs.tag }}
+      channel: ${{ steps.identity.outputs.channel }}
+      publish: ${{ steps.identity.outputs.publish }}
+      sha: ${{ steps.identity.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+      - id: identity
+        run: node scripts/release-identity.mjs
+      - name: Refuse to overwrite an existing public release
+        if: steps.identity.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.identity.outputs.tag }}
+        run: |
+          if gh release view "$RELEASE_TAG" --json isDraft > "$RUNNER_TEMP/existing.json" 2>/dev/null; then
+            node -e 'if(!JSON.parse(require("fs").readFileSync(process.argv[1])).isDraft)throw Error("Published releases are immutable")' "$RUNNER_TEMP/existing.json"
+          fi
+
   source-checks:
+    needs: identity
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v6
@@ -42,6 +86,11 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Apply resolved build identity
+        env:
+          RELEASE_VERSION: ${{ needs.identity.outputs.version }}
+        run: node scripts/release-identity.mjs apply "$RELEASE_VERSION"
+
       - name: Run frontend and release-tool checks
         run: pnpm check
 
@@ -64,8 +113,8 @@ jobs:
           cargo test --manifest-path src-tauri/sidecar/Cargo.toml
 
   build-desktop:
-    if: startsWith(github.ref, 'refs/tags/desktop-v') || github.event_name == 'workflow_dispatch'
-    needs: source-checks
+    if: needs.identity.outputs.publish == 'true' || github.event_name == 'workflow_dispatch'
+    needs: [identity, source-checks]
     strategy:
       fail-fast: false
       # tauri-action merges one latest.json through the shared draft release.
@@ -108,7 +157,7 @@ jobs:
           fetch-depth: 0
 
       - name: Require tagged-release credentials
-        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        if: needs.identity.outputs.publish == 'true'
         shell: bash
         run: |
           if [ "$HAS_UPDATER_SIGNING" != "true" ]; then
@@ -223,12 +272,18 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Apply resolved build identity
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.identity.outputs.version }}
+        run: node scripts/release-identity.mjs apply "$RELEASE_VERSION"
+
       - name: Extract release notes
         id: changelog
-        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        if: needs.identity.outputs.publish == 'true'
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME#desktop-v}"
+          VERSION="${{ needs.identity.outputs.version }}"
           NOTES=$(awk "/^## \[$VERSION\]/{found=1; next} /^## \[/{found=0} found" CHANGELOG.md)
           echo "notes<<__NOTES__" >> "$GITHUB_OUTPUT"
           echo "$NOTES" >> "$GITHUB_OUTPUT"
@@ -247,12 +302,13 @@ jobs:
         with:
           projectPath: .
           tauriScript: pnpm tauri
-          tagName: ${{ startsWith(github.ref, 'refs/tags/') && 'desktop-v__VERSION__' || '' }}
+          tagName: ${{ needs.identity.outputs.tag }}
           releaseName: "Desktop Release Canary v__VERSION__"
           releaseBody: ${{ steps.changelog.outputs.notes || 'Signed desktop update infrastructure canary.' }}
           releaseDraft: true
-          prerelease: false
-          includeUpdaterJson: ${{ startsWith(github.ref, 'refs/tags/') }}
+          releaseCommitish: ${{ needs.identity.outputs.sha }}
+          prerelease: ${{ needs.identity.outputs.channel == 'latest' }}
+          includeUpdaterJson: ${{ needs.identity.outputs.publish == 'true' }}
           updaterJsonPreferNsis: true
           updaterJsonKeepUniversal: true
           retryAttempts: ${{ runner.os == 'macOS' && '1' || '0' }}
@@ -318,8 +374,13 @@ jobs:
           rm -rf ~/private_keys 2>/dev/null || true
 
   finalize-release:
-    if: always() && startsWith(github.ref, 'refs/tags/desktop-v')
-    needs: [source-checks, build-desktop]
+    if: always() && needs.identity.result == 'success' && needs.identity.outputs.publish == 'true'
+    needs: [identity, source-checks, build-desktop]
+    concurrency:
+      group: desktop-canary-publication
+      cancel-in-progress: false
+    env:
+      RELEASE_TAG: ${{ needs.identity.outputs.tag }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -329,13 +390,23 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release edit "$GITHUB_REF_NAME" --draft
-            echo "::error::Required jobs failed; $GITHUB_REF_NAME remains a draft"
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --draft
+            echo "::error::Required jobs failed; $RELEASE_TAG remains a draft"
           else
             echo "::error::Required jobs failed; no release was created"
           fi
           exit 1
+
+      - name: Attach exact release identity
+        if: needs.source-checks.result == 'success' && needs.build-desktop.result == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ needs.identity.outputs.version }}
+          RELEASE_CHANNEL: ${{ needs.identity.outputs.channel }}
+        run: |
+          node -e 'const fs=require("fs");fs.writeFileSync(process.env.RUNNER_TEMP+"/release-identity.json",JSON.stringify({schemaVersion:1,version:process.env.RELEASE_VERSION,channel:process.env.RELEASE_CHANNEL,tag:process.env.RELEASE_TAG,sourceSha:process.env.GITHUB_SHA,workflowUrl:`https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`} ,null,2)+"\n")'
+          gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/release-identity.json" --clobber
 
       - name: Download and validate the complete draft
         if: needs.source-checks.result == 'success' && needs.build-desktop.result == 'success'
@@ -344,26 +415,26 @@ jobs:
         run: |
           RELEASE_DIR="$RUNNER_TEMP/desktop-release"
           mkdir -p "$RELEASE_DIR"
-          gh release view "$GITHUB_REF_NAME" --json tagName,isDraft,assets > "$RELEASE_DIR/release.json"
-          gh release download "$GITHUB_REF_NAME" --pattern latest.json --dir "$RELEASE_DIR"
+          gh release view "$RELEASE_TAG" --json tagName,isDraft,isPrerelease,assets > "$RELEASE_DIR/release.json"
+          gh release download "$RELEASE_TAG" --pattern latest.json --dir "$RELEASE_DIR"
           node .github/scripts/validate-release.mjs \
             --release "$RELEASE_DIR/release.json" \
             --latest "$RELEASE_DIR/latest.json" \
-            --tag "$GITHUB_REF_NAME" \
+            --tag "$RELEASE_TAG" \
             --repository "$GITHUB_REPOSITORY"
           node .github/scripts/write-release-checksums.mjs \
             "$RELEASE_DIR/release.json" "$RELEASE_DIR/SHA256SUMS"
-          gh release upload "$GITHUB_REF_NAME" "$RELEASE_DIR/SHA256SUMS" --clobber
+          gh release upload "$RELEASE_TAG" "$RELEASE_DIR/SHA256SUMS" --clobber
 
       - name: Remove redundant detached signatures
         if: needs.source-checks.result == 'success' && needs.build-desktop.result == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release view "$GITHUB_REF_NAME" --json assets \
+          gh release view "$RELEASE_TAG" --json assets \
             --jq '.assets[].name | select(endswith(".sig"))' |
           while read -r name; do
-            if [ -n "$name" ]; then gh release delete-asset "$GITHUB_REF_NAME" "$name" --yes; fi
+            if [ -n "$name" ]; then gh release delete-asset "$RELEASE_TAG" "$name" --yes; fi
           done
 
       - name: Write release evidence
@@ -372,7 +443,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME#desktop-v}"
+          VERSION="${{ needs.identity.outputs.version }}"
           CHANGELOG=$(awk "/^## \[$VERSION\]/{found=1; next} /^## \[/{found=0} found" CHANGELOG.md)
           {
             echo "$CHANGELOG"
@@ -385,14 +456,19 @@ jobs:
             echo "- Linux AppImage, DEB, and RPM packages validated for x86_64 and ARM64."
             echo "- Workflow: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             echo "- Commit: \`${GITHUB_SHA}\`"
-            echo "- Exact hashes: https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/SHA256SUMS"
+            echo "- Exact hashes: https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/SHA256SUMS"
             echo
             echo "Installed old-to-new testbed evidence is recorded separately and is not implied by CI."
           } > "$RUNNER_TEMP/release-notes.md"
-          gh release edit "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md"
+          gh release edit "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md"
 
       - name: Publish validated release
         if: needs.source-checks.result == 'success' && needs.build-desktop.result == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit "$GITHUB_REF_NAME" --draft=false --latest
+        run: |
+          if [ "${{ needs.identity.outputs.channel }}" = latest ]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest
+          fi

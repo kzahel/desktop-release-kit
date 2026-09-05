@@ -32,6 +32,10 @@ function fixture() {
       githubRepo: "kzahel/desktop-release-kit",
       tagPrefix: "desktop-v",
       tauriUpdates: true,
+    channels: {
+      stable: { displayName: "Stable", tagPrefix: "desktop-v", releaseKind: "release" },
+      latest: { displayName: "Latest", tagPrefix: "desktop-latest-v", releaseKind: "prerelease" },
+    },
     },
   };
 }

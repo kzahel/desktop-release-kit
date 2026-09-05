@@ -13,7 +13,8 @@ or visual design.
 ## What lives here
 
 - The Desktop Release Canary Tauri application.
-- The normative [`desktop-update-v1`](contract/desktop-update-v1.md) contract.
+- The normative [`desktop-update-v1`](contract/desktop-update-v1.md) contract
+  and additive [Stable/Latest extension](contract/desktop-update-channels-v1.md).
 - A product configuration consumed by the shared
   [`simple-app-update-server`](https://github.com/kzahel/simple-app-update-server).
 - Release configuration and draft-finalization validators.
@@ -54,7 +55,7 @@ pnpm tauri dev
 
 The `prepare-sidecar` command compiles a tiny target-specific binary and stages
 it under `src-tauri/binaries/` using Tauri's required target-triple naming.
-Both the webview and sidecar expose build IDs so an update test can establish
+The native app, webview, and sidecar expose matching build IDs so an update test can establish
 that the complete installed application was replaced.
 
 For a local bundled smoke test:
@@ -64,12 +65,25 @@ pnpm tauri build --debug --bundles app --no-sign
 ```
 
 The local smoke build deliberately skips signing because release credentials
-remain in GitHub Actions. Only the tagged workflow establishes signing,
+remain in GitHub Actions. Only the signed release workflow establishes signing,
 notarization, and updater-artifact evidence.
 
 ## Release invariants
 
-Pushing `desktop-vX.Y.Z` starts the signed release workflow. A release stays a
+Relevant passing `main` commits automatically publish signed **Latest**
+prereleases with `desktop-latest-vM.(m+1).S` identities, where the source version
+is `M.m.p` and `S = workflow run number * 100 + attempt`. Numeric versions are
+validated against MSI limits. Retries receive a new identity; exhausted trains
+fail before packaging and require advancing the source minor version.
+
+Pushing `desktop-vX.Y.Z` deliberately publishes **Stable** and must match the
+source version. After a `0.3.S` Latest train, a `0.4.0` Stable release catches up.
+Existing clients and omitted-channel requests remain on Stable. The native
+canary saves the chosen track, checks Latest every 30 minutes and Stable daily,
+and requires **Update and relaunch** to install. Returning to Stable keeps the
+installed newer build until Stable catches up.
+
+Both channels use the same signed workflow. A release stays a
 draft until all five updater targets are present and validated:
 
 - macOS Apple silicon
@@ -79,7 +93,8 @@ draft until all five updater targets are present and validated:
 - Linux ARM64, using AppImage for in-app updates
 
 The finalizer also requires the normal DMG, MSI, DEB, and RPM installer matrix,
-checks every updater URL and detached signature, writes `SHA256SUMS`, removes
+checks every updater URL and detached signature, attaches the exact source
+identity in `release-identity.json`, writes `SHA256SUMS`, removes
 redundant detached signature assets after validation, and only then publishes.
 
 The canary's default installed path is deliberately non-privileged: DMG to App
@@ -88,7 +103,7 @@ on Linux. Products that must register resources outside their macOS App bundle
 may deliberately use the contract's integrated PKG profile; that is a product
 capability exception, not the shared default.
 
-Tagged releases require:
+Published Stable and Latest releases require:
 
 - A unique Tauri updater key and passphrase
 - Shared Developer ID and App Store Connect notarization credentials

@@ -14,24 +14,33 @@ function requireAsset(assetNames, name) {
 function requireMatchingAsset(assetNames, pattern, label) {
   const matches = [...assetNames].filter((name) => pattern.test(name));
   if (matches.length !== 1) {
-    fail(`expected exactly one ${label}, found ${matches.length}: ${matches.join(", ")}`);
+    fail(
+      `expected exactly one ${label}, found ${matches.length}: ${matches.join(", ")}`,
+    );
   }
   return matches[0];
 }
 
 export function validateRelease({ release, latest, tag, repository }) {
-  if (!/^desktop-v\d+\.\d+\.\d+$/.test(tag)) {
+  if (!/^desktop-(?:latest-)?v\d+\.\d+\.\d+$/.test(tag)) {
     fail(`unexpected desktop tag: ${tag}`);
   }
-  const version = tag.slice("desktop-v".length);
-  if (release.tagName !== tag) fail(`release tag ${release.tagName} does not match ${tag}`);
-  if (!release.isDraft) fail("release must remain a draft until validation succeeds");
+  const version = tag.replace(/^desktop-(?:latest-)?v/, "");
+  const preview = tag.startsWith("desktop-latest-v");
+  if (release.isPrerelease !== preview)
+    fail("release prerelease flag does not match channel tag");
+  if (release.tagName !== tag)
+    fail(`release tag ${release.tagName} does not match ${tag}`);
+  if (!release.isDraft)
+    fail("release must remain a draft until validation succeeds");
   if (!Array.isArray(release.assets)) fail("release assets are missing");
 
   const assetNames = new Set();
   for (const asset of release.assets) {
     if (!asset.name || assetNames.has(asset.name)) {
-      fail(`missing or duplicate release asset name: ${asset.name ?? "<empty>"}`);
+      fail(
+        `missing or duplicate release asset name: ${asset.name ?? "<empty>"}`,
+      );
     }
     assetNames.add(asset.name);
     if (!/^sha256:[0-9a-f]{64}$/i.test(asset.digest ?? "")) {
@@ -53,7 +62,10 @@ export function validateRelease({ release, latest, tag, repository }) {
     [/-[0-9.]+-1\.aarch64\.rpm$/, "Linux ARM64 RPM"],
   ];
   for (const [pattern, label] of installerPatterns) {
-    requireMatchingAsset(assetNames, pattern, label);
+    const name = requireMatchingAsset(assetNames, pattern, label);
+    const assetVersion = name.match(/_(\d+\.\d+\.\d+)_|-(\d+\.\d+\.\d+)-1\./);
+    if ((assetVersion?.[1] ?? assetVersion?.[2]) !== version)
+      fail(`installer ${name} does not match release version ${version}`);
   }
 
   if (latest.version !== version) {
@@ -73,13 +85,23 @@ export function validateRelease({ release, latest, tag, repository }) {
   for (const platform of requiredPlatforms) {
     const metadata = latest.platforms[platform];
     if (!metadata) fail(`latest.json is missing platform ${platform}`);
-    if (typeof metadata.signature !== "string" || metadata.signature.length < 32) {
+    if (
+      typeof metadata.signature !== "string" ||
+      metadata.signature.length < 32
+    ) {
       fail(`latest.json platform ${platform} has no usable signature`);
     }
-    if (typeof metadata.url !== "string" || !metadata.url.startsWith(expectedUrlPrefix)) {
-      fail(`latest.json platform ${platform} has an unexpected URL: ${metadata.url}`);
+    if (
+      typeof metadata.url !== "string" ||
+      !metadata.url.startsWith(expectedUrlPrefix)
+    ) {
+      fail(
+        `latest.json platform ${platform} has an unexpected URL: ${metadata.url}`,
+      );
     }
-    const assetName = decodeURIComponent(metadata.url.slice(expectedUrlPrefix.length));
+    const assetName = decodeURIComponent(
+      metadata.url.slice(expectedUrlPrefix.length),
+    );
     requireAsset(assetNames, assetName);
     requireAsset(assetNames, `${assetName}.sig`);
     const expectedSuffix = platform.startsWith("darwin-")
@@ -103,7 +125,8 @@ function parseArguments(argv) {
   for (let index = 0; index < argv.length; index += 2) {
     const name = argv[index];
     const value = argv[index + 1];
-    if (!name?.startsWith("--") || value === undefined) fail(`invalid argument near ${name ?? "<end>"}`);
+    if (!name?.startsWith("--") || value === undefined)
+      fail(`invalid argument near ${name ?? "<end>"}`);
     result[name.slice(2)] = value;
   }
   for (const name of ["release", "latest", "tag", "repository"]) {

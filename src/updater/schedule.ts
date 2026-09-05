@@ -15,6 +15,7 @@ interface Timers {
 export function scheduleAutomaticChecks(
   check: (reason: AutomaticCheckReason) => void,
   timers: Timers = globalThis,
+  track: "stable" | "latest" = "stable",
 ): () => void {
   const startup = timers.setTimeout(
     () => check("startup"),
@@ -22,7 +23,7 @@ export function scheduleAutomaticChecks(
   );
   const periodic = timers.setInterval(
     () => check("periodic"),
-    PERIODIC_CHECK_INTERVAL_MS,
+    track === "latest" ? 30 * 60 * 1000 : PERIODIC_CHECK_INTERVAL_MS,
   );
 
   return () => {

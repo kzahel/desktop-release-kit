@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 export interface CanaryInfo {
   version: string;
+  buildId: string;
   target: string;
   arch: string;
   installationId: string;
@@ -34,6 +35,9 @@ export async function loadRuntimeFacts(): Promise<RuntimeFacts> {
     throw new Error(
       `Native version ${native.version} does not match Tauri API version ${apiVersion}`,
     );
+  }
+  if (native.buildId !== __CANARY_BUILD_ID__ || sidecar.buildId !== __CANARY_BUILD_ID__) {
+    throw new Error("Native, webview, and sidecar build IDs do not agree");
   }
   return {
     ...native,

@@ -71,6 +71,10 @@ export function validateConfiguration({
     githubRepo: "kzahel/desktop-release-kit",
     tagPrefix: "desktop-v",
     tauriUpdates: true,
+    channels: {
+      stable: { displayName: "Stable", tagPrefix: "desktop-v", releaseKind: "release" },
+      latest: { displayName: "Latest", tagPrefix: "desktop-latest-v", releaseKind: "prerelease" },
+    },
   };
   if (JSON.stringify(product) !== JSON.stringify(expectedProduct)) {
     fail(`unexpected update-server product config: ${JSON.stringify(product)}`);

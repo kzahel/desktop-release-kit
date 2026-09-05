@@ -1,6 +1,8 @@
 # Desktop update channels extension v1
 
-Status: implemented contract; installed acceptance pending.
+Status: implemented and [accepted on Ubuntu ARM64](../docs/evidence/stable-latest-linux-arm64.md).
+All five signed targets passed CI; installed macOS and Windows channel behavior
+remains unverified.
 
 This additive extension preserves [desktop-update-v1](desktop-update-v1.md).
 Released endpoints, keys, and requests without a channel retain Stable meaning.

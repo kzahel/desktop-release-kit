@@ -19,8 +19,8 @@ or visual design.
   [`simple-app-update-server`](https://github.com/kzahel/simple-app-update-server).
 - Release configuration and draft-finalization validators.
 - A real old-to-new [testbed acceptance runbook](docs/canary-testbed-runbook.md).
-- Redacted evidence from the latest
-  [`0.1.0 -> 0.1.1` acceptance campaign](docs/evidence/desktop-v0.1.0-to-v0.1.1.md).
+- Redacted evidence from the [Stable/Latest Ubuntu ARM64 campaign](docs/evidence/stable-latest-linux-arm64.md)
+  and the earlier [three-platform `0.1.0 -> 0.1.1` campaign](docs/evidence/desktop-v0.1.0-to-v0.1.1.md).
 
 The generic server stays separate. Each consuming product continues to own its
 branding, lifecycle, product UI, release tag, endpoint route, and updater key.
@@ -127,6 +127,21 @@ Generate a per-app updater key, choose a product-owned route, and validate the
 new application against its own older signed release. Shared packages or
 reusable workflows will be extracted only after the canary and at least one
 existing application prove the same boundary.
+
+For an existing consumer such as Yep Anywhere, preserve its shipped updater
+key and endpoint. Adopt the channel contract in this order:
+
+1. Define separate Stable/Latest release rules and a numeric version train that
+   fits that application's supported package formats.
+2. Add a native-owned saved track and candidate invalidation while preserving
+   the application's own checks, active-work handling, and restart policy.
+3. Extend its existing signed workflow to finalize passing main builds as Latest
+   and retain deliberate Stable publication.
+4. Opt in its product configuration and run an installed campaign from an older
+   shipped Stable build, including return-to-Stable catch-up and identity checks.
+
+Keep this as product-owned integration until the canary and that consumer have
+proved the same boundary. Other applications are not opted in by this campaign.
 
 ## License
 

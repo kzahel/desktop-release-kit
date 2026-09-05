@@ -6,7 +6,9 @@ common `machine-control` CLI and platform guides own VM lifecycle, transport, UI
 screenshots, and recovery.
 
 The latest completed campaign is the
-[`desktop-v0.1.0 -> desktop-v0.1.1` evidence record](evidence/desktop-v0.1.0-to-v0.1.1.md).
+[Stable/Latest Ubuntu ARM64 evidence record](evidence/stable-latest-linux-arm64.md).
+The earlier [three-platform `desktop-v0.1.0 -> desktop-v0.1.1` campaign](evidence/desktop-v0.1.0-to-v0.1.1.md)
+remains the baseline packaging and installed-update proof.
 
 ## Preconditions
 
@@ -30,13 +32,19 @@ handle="$(jq -r '.data.handle' <<<"$workspace")"
 claim="$(jq -r '.data.claim.claimId' <<<"$workspace")"
 $mc --target linux --workspace "$handle" --claim "$claim" target up
 $mc --target linux --workspace "$handle" --claim "$claim" target doctor
+$mc --target linux --workspace "$handle" --claim "$claim" os -- \
+  /usr/bin/curl --max-time 20 -fsS https://updates.graehlarts.com/health
 # Run the campaign, then release in cleanup:
 $mc --target linux --claim "$claim" workspace release "$handle"
 ```
 
 Read the common CLI and platform guides, acquire an exclusive claim and an
 isolated workspace, and use target-native administration, semantics, and
-capture. Release the workspace and claim when finished. Private inventories
+capture. Verify application endpoint access from the guest as well as the
+controller: a healthy resident does not establish outbound HTTPS connectivity.
+If the controller uses an exit node or VPN, inspect the VM subnet route when
+guest connections time out. Record temporary routing changes and restore them
+after releasing the workspace and claim. Private inventories
 select concrete targets; keep those values out of public evidence.
 
 ## Freeze the exact candidates

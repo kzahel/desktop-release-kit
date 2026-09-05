@@ -193,7 +193,7 @@ pub async fn check_update(
     } else {
         super::UPDATE_ENDPOINT.into()
     };
-    let update = app
+    let mut update = app
         .updater_builder()
         .endpoints(vec![endpoint
             .parse()
@@ -207,6 +207,10 @@ pub async fn check_update(
         .check()
         .await
         .map_err(|e| e.to_string())?;
+    // The plugin builder timeout covers discovery only, not the returned download.
+    if let Some(candidate) = &mut update {
+        candidate.timeout = Some(Duration::from_secs(120));
+    }
     if supported
         && update.as_ref().is_some_and(|u| {
             u.raw_json
@@ -395,5 +399,63 @@ mod discovery_tests {
             );
             thread.join().unwrap();
         }
+    }
+}
+
+#[cfg(test)]
+mod signature_tests {
+    use super::*;
+    use std::io::{Read, Write};
+
+    #[test]
+    fn real_updater_rejects_tampered_signed_payload_without_installing() {
+        // Signature from public desktop-v0.1.1 Linux ARM64, with altered bytes.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let root = format!("http://{}", listener.local_addr().unwrap());
+        let metadata = serde_json::json!({
+            "version":"99.0.0", "signature":include_str!("fixture-signature.txt"),
+            "url":format!("{root}/artifact"), "channel":"latest"
+        })
+        .to_string();
+        let thread = std::thread::spawn(move || {
+            for body in [metadata.as_str(), "tampered update payload"] {
+                let (mut stream, _) = listener.accept().unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(5)))
+                    .unwrap();
+                let mut request = [0; 4096];
+                assert!(stream.read(&mut request).unwrap() > 0);
+                write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{body}", body.len()).unwrap();
+            }
+        });
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        let key = config["plugins"]["updater"]["pubkey"].as_str().unwrap();
+        let mut context = tauri::test::mock_context(tauri::test::noop_assets());
+        context.config_mut().plugins.0.insert(
+            "updater".into(),
+            serde_json::json!({"pubkey": key, "dangerousInsecureTransportProtocol": true}),
+        );
+        let app = tauri::test::mock_builder()
+            .plugin(tauri_plugin_updater::Builder::new().pubkey(key).build())
+            .build(context)
+            .unwrap();
+        let updater = app
+            .updater_builder()
+            .endpoints(vec![root.parse().unwrap()])
+            .unwrap()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .unwrap();
+        tauri::async_runtime::block_on(async {
+            let mut update = updater.check().await.unwrap().unwrap();
+            update.timeout = Some(Duration::from_secs(5));
+            let error = update.download(|_, _| {}, || {}).await.unwrap_err();
+            assert!(
+                matches!(error, tauri_plugin_updater::Error::Minisign(_)),
+                "{error:?}"
+            );
+        });
+        thread.join().unwrap();
     }
 }

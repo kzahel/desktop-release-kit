@@ -41,6 +41,7 @@ export class UpdaterController {
   private checking: Promise<void> | null = null;
   private installing = false;
   private candidate: string | null = null;
+  private installedVersion: string | null = null;
   constructor(
     private bridge: Bridge,
     private changed: (snapshot: Snapshot) => void,
@@ -59,7 +60,12 @@ export class UpdaterController {
     }
   }
   async select(track: Track) {
-    if (this.installing || this.snapshot.selecting || !this.snapshot.ready)
+    if (
+      this.installedVersion ||
+      this.installing ||
+      this.snapshot.selecting ||
+      !this.snapshot.ready
+    )
       return;
     this.generation++;
     this.checking = null;
@@ -77,7 +83,12 @@ export class UpdaterController {
     }
   }
   async check(reason: CheckReason = "manual"): Promise<void> {
-    if (!this.snapshot.ready || this.installing || this.snapshot.selecting)
+    if (
+      this.installedVersion ||
+      !this.snapshot.ready ||
+      this.installing ||
+      this.snapshot.selecting
+    )
       return;
     if (this.checking) return this.checking;
     if (reason !== "manual" && this.candidate) return;
@@ -145,34 +156,42 @@ export class UpdaterController {
   }
   async install() {
     if (this.installing || this.checking || this.snapshot.selecting) return;
-    const version = this.candidate;
+    const version = this.installedVersion ?? this.candidate;
     if (!version) return this.check();
     this.installing = true;
-    this.emit({ state: { phase: "downloading", version, downloadedBytes: 0 } });
     try {
-      await this.bridge.install((event) =>
+      if (!this.installedVersion) {
         this.emit({
-          state: event.installing
-            ? { phase: "installing", version }
-            : { phase: "downloading", version, ...event },
-        }),
-      );
+          state: { phase: "downloading", version, downloadedBytes: 0 },
+        });
+        await this.bridge.install((event) =>
+          this.emit({
+            state: event.installing
+              ? { phase: "installing", version }
+              : { phase: "downloading", version, ...event },
+          }),
+        );
+        this.installedVersion = version;
+      }
       this.emit({ state: { phase: "installing", version } });
       await this.bridge.relaunch();
     } catch (error) {
       this.installing = false;
       this.emit({
-        state: {
-          phase: "error",
-          operation: "install",
-          version,
-          message: message(error),
-        },
+        state: this.installedVersion
+          ? { phase: "relaunch-failed", version, message: message(error) }
+          : {
+              phase: "error",
+              operation: "install",
+              version,
+              message: message(error),
+            },
       });
     }
   }
   async dismiss() {
-    if (this.installing || this.snapshot.selecting) return;
+    if (this.installedVersion || this.installing || this.snapshot.selecting)
+      return;
     this.generation++;
     this.checking = null;
     this.candidate = null;

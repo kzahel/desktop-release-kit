@@ -20,9 +20,18 @@ The latest completed campaign is the
 From the dotfiles checkout:
 
 ```bash
-~/code/machine-control/bin/machine-control target list
-~/code/machine-control/bin/machine-control --target linux target doctor
-~/code/machine-control/bin/machine-control workspace acquire --help
+mc=~/code/machine-control/bin/machine-control
+$mc targets
+$mc --target linux target doctor
+workspace="$($mc --target linux workspace acquire --intent isolated \
+  --reason 'canary update acceptance' \
+  --claimant-authority maintainer --claimant-id canary-campaign)"
+handle="$(jq -r '.data.handle' <<<"$workspace")"
+claim="$(jq -r '.data.claim.claimId' <<<"$workspace")"
+$mc --target linux --workspace "$handle" --claim "$claim" target up
+$mc --target linux --workspace "$handle" --claim "$claim" target doctor
+# Run the campaign, then release in cleanup:
+$mc --target linux --claim "$claim" workspace release "$handle"
 ```
 
 Read the common CLI and platform guides, acquire an exclusive claim and an

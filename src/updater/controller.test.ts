@@ -156,3 +156,21 @@ describe("native-owned update controller", () => {
     expect(bridge.check).not.toHaveBeenCalled();
   });
 });
+
+it("retries relaunch without reinstalling or changing the installed track", async () => {
+  const { bridge, updater } = fixture();
+  await updater.initialize();
+  await updater.check();
+  bridge.relaunch.mockRejectedValueOnce(new Error("restart unavailable"));
+  await updater.install();
+  expect(updater.snapshot.state.phase).toBe("relaunch-failed");
+  await updater.select("latest");
+  await updater.check();
+  await updater.dismiss();
+  expect(bridge.select).not.toHaveBeenCalled();
+  expect(bridge.clear).not.toHaveBeenCalled();
+  expect(bridge.check).toHaveBeenCalledTimes(1);
+  await updater.install();
+  expect(bridge.install).toHaveBeenCalledTimes(1);
+  expect(bridge.relaunch).toHaveBeenCalledTimes(2);
+});

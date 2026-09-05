@@ -12,13 +12,16 @@ function shortId(value: string): string {
 function statusCopy(state: UpdaterState): { title: string; body: string } {
   switch (state.phase) {
     case "waiting-for-stable":
-      return { title: "Waiting for Stable to catch up", body: "Stable is selected. This installed build is newer than the available Stable release and will stay installed until a newer Stable update arrives." };
+      return {
+        title: "Waiting for Stable to catch up",
+        body: "Stable is selected. This installed build is newer than the available Stable release and will stay installed until a newer Stable update arrives.",
+      };
     case "idle":
       return {
         title: "Update system ready",
         body: state.lastReason
           ? `The last ${state.lastReason} check completed without presenting an update.`
-          : "Startup and daily checks run silently. Manual checks report their result.",
+          : "Automatic checks run silently. Manual checks report their result.",
       };
     case "checking":
       return {
@@ -52,6 +55,11 @@ function statusCopy(state: UpdaterState): { title: string; body: string } {
         title: `Installing ${state.version}`,
         body: "The canary will relaunch after Tauri replaces the signed application.",
       };
+    case "relaunch-failed":
+      return {
+        title: "Update installed; relaunch needed",
+        body: `Choose Relaunch to finish. ${state.message}`,
+      };
     case "error":
       return {
         title: `${state.operation === "check" ? "Update check" : "Installation"} failed`,
@@ -60,7 +68,15 @@ function statusCopy(state: UpdaterState): { title: string; body: string } {
   }
 }
 
-function Fact({ label, value, title }: { label: string; value: string; title?: string }) {
+function Fact({
+  label,
+  value,
+  title,
+}: {
+  label: string;
+  value: string;
+  title?: string;
+}) {
   return (
     <div className="fact">
       <dt>{label}</dt>
@@ -85,12 +101,14 @@ export function App() {
   }, []);
 
   const busy =
-    !updater.ready || updater.selecting ||
+    !updater.ready ||
+    updater.selecting ||
     updater.state.phase === "checking" ||
     updater.state.phase === "downloading" ||
     updater.state.phase === "installing";
   const canInstall =
     updater.state.phase === "available" ||
+    updater.state.phase === "relaunch-failed" ||
     (updater.state.phase === "error" && updater.state.operation === "install");
 
   return (
@@ -117,16 +135,35 @@ export function App() {
 
       <section className="panel">
         <label htmlFor="update-track">Update track </label>
-        <select id="update-track" value={updater.track}
-          disabled={!updater.ready || updater.selecting || updater.state.phase === "downloading" || updater.state.phase === "installing"}
-          onChange={(event) => void updater.select(event.target.value as "stable" | "latest")}>
+        <select
+          id="update-track"
+          value={updater.track}
+          disabled={
+            !updater.ready ||
+            updater.selecting ||
+            updater.state.phase === "downloading" ||
+            updater.state.phase === "installing" ||
+            updater.state.phase === "relaunch-failed"
+          }
+          onChange={(event) =>
+            void updater.select(event.target.value as "stable" | "latest")
+          }
+        >
           <option value="stable">Stable</option>
           <option value="latest">Latest</option>
         </select>
-        <p className="muted">{updater.track === "latest" ? "Latest receives passing CI builds. Checks run every 30 minutes." : "Stable receives deliberate releases. Checks run daily."} Updates install only when you choose Update.</p>
+        <p className="muted">
+          {updater.track === "latest"
+            ? "Latest receives passing CI builds. Checks run every 30 minutes."
+            : "Stable receives deliberate releases. Checks run daily."}{" "}
+          Updates install only when you choose Update.
+        </p>
       </section>
 
-      <section className={`status status-${updater.state.phase}`} aria-live="polite">
+      <section
+        className={`status status-${updater.state.phase}`}
+        aria-live="polite"
+      >
         <div>
           <p className="status-kicker">Updater state</p>
           <h2>{copy.title}</h2>
@@ -137,11 +174,21 @@ export function App() {
             className="primary"
             type="button"
             disabled={busy}
-            onClick={() => void (canInstall ? updater.install() : updater.check("manual"))}
+            onClick={() =>
+              void (canInstall ? updater.install() : updater.check("manual"))
+            }
           >
-            {canInstall ? "Update and relaunch" : busy ? "Working…" : "Check now"}
+            {updater.state.phase === "relaunch-failed"
+              ? "Relaunch"
+              : canInstall
+                ? "Update and relaunch"
+                : busy
+                  ? "Working…"
+                  : "Check now"}
           </button>
-          {updater.state.phase !== "idle" && !busy ? (
+          {updater.state.phase !== "idle" &&
+          updater.state.phase !== "relaunch-failed" &&
+          !busy ? (
             <button type="button" onClick={updater.dismiss}>
               Dismiss
             </button>
@@ -155,7 +202,11 @@ export function App() {
             aria-valuemin={0}
             aria-valuemax={100}
           >
-            <span style={progress === undefined ? undefined : { width: `${progress}%` }} />
+            <span
+              style={
+                progress === undefined ? undefined : { width: `${progress}%` }
+              }
+            />
           </div>
         ) : null}
         {updater.state.phase === "available" && updater.state.notes ? (
@@ -170,7 +221,11 @@ export function App() {
               <p className="section-label">Installed artifact</p>
               <h2>Runtime identity</h2>
             </div>
-            <span className={factsError ? "health bad" : facts ? "health good" : "health"}>
+            <span
+              className={
+                factsError ? "health bad" : facts ? "health good" : "health"
+              }
+            >
               {factsError ? "failed" : facts ? "verified" : "loading"}
             </span>
           </div>
@@ -186,7 +241,9 @@ export function App() {
               />
             </dl>
           ) : (
-            <p className="muted">{factsError ?? "Reading native runtime facts…"}</p>
+            <p className="muted">
+              {factsError ?? "Reading native runtime facts…"}
+            </p>
           )}
         </section>
 
@@ -200,6 +257,11 @@ export function App() {
           {facts ? (
             <dl className="facts">
               <Fact
+                label="Native"
+                value={shortId(facts.buildId)}
+                title={facts.buildId}
+              />
+              <Fact
                 label="Webview"
                 value={shortId(facts.webviewBuildId)}
                 title={facts.webviewBuildId}
@@ -210,7 +272,10 @@ export function App() {
                 title={facts.sidecar.buildId}
               />
               <Fact label="Sidecar version" value={facts.sidecar.version} />
-              <Fact label="Sidecar target" value={`${facts.sidecar.target} / ${facts.sidecar.arch}`} />
+              <Fact
+                label="Sidecar target"
+                value={`${facts.sidecar.target} / ${facts.sidecar.arch}`}
+              />
             </dl>
           ) : (
             <p className="muted">The packaged sidecar is probed at startup.</p>
@@ -223,7 +288,9 @@ export function App() {
           <p className="section-label">Shared control plane</p>
           <h2>Product-owned route</h2>
         </div>
-        <code>{facts?.endpoint ?? "https://updates.graehlarts.com/canary/tauri/…"}</code>
+        <code>
+          {facts?.endpoint ?? "https://updates.graehlarts.com/canary/tauri/…"}
+        </code>
         <a href={RELEASES_URL} target="_blank" rel="noreferrer">
           GitHub releases ↗
         </a>

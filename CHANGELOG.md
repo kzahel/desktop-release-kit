@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.0]
+
+- Stable catch-up release for installations on the 0.3 Latest train.
+- Show native, webview, and sidecar build IDs together.
+- Retry a failed relaunch without downloading or installing the update again.
+
 ## [0.2.0]
 
 - Add saved Stable and Latest update tracks with explicit installation.

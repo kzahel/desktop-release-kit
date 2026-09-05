@@ -14,6 +14,7 @@ export type UpdaterState =
       totalBytes?: number;
     }
   | { phase: "installing"; version: string }
+  | { phase: "relaunch-failed"; version: string; message: string }
   | {
       phase: "error";
       operation: "check" | "install";

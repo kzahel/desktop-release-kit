@@ -16,7 +16,9 @@ Other discovery failures fail the check and preserve the setting.
 Update and version routes accept exactly one `?channel=<id>`. Omission means
 Stable. Empty, duplicate, malformed, and unsupported explicit channels return
 400 with an explanation. Responses include `X-Update-Channel`. Channel-capable
-clients also require this header on explicit checks. Each channel has independent
+clients require this header on the explicit `/version` response and the matching
+`channel` field on an updater candidate (the native plugin does not expose
+response headers). Each channel has independent
 candidates, notes, memory/disk cache, stale fallback and log identity. Existing
 Stable cache files remain Stable; additional channel caches start empty.
 
@@ -34,7 +36,9 @@ package ordering without prerelease-to-MSI conversion. A deliberate Stable
 `S = workflow run number * 100 + run attempt`, tag
 `desktop-latest-vM.(m+1).S`, and GitHub `prerelease=true`. Attempts are 1–99;
 S must be <=65535 and both major/minor <=255. Exceeding these limits fails
-before packaging and requires advancing the release train. This conservative
+before packaging. At sequence exhaustion, maintainers must advance the release
+train and establish a fresh workflow run sequence; a source version bump alone
+does not reset GitHub's workflow run counter. This conservative
 mapping fits MSI, NSIS, macOS bundle versions, DEB and RPM. All application,
 webview, sidecar, manifests and native package versions use that same identity.
 The source SHA is recorded separately as the build ID and release provenance.

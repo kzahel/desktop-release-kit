@@ -74,7 +74,8 @@ Relevant passing `main` commits automatically publish signed **Latest**
 prereleases with `desktop-latest-vM.(m+1).S` identities, where the source version
 is `M.m.p` and `S = workflow run number * 100 + attempt`. Numeric versions are
 validated against MSI limits. Retries receive a new identity; exhausted trains
-fail before packaging and require advancing the source minor version.
+fail before packaging and require a new train and workflow sequence, as
+described in the channel contract.
 
 Pushing `desktop-vX.Y.Z` deliberately publishes **Stable** and must match the
 source version. After a `0.3.S` Latest train, a `0.4.0` Stable release catches up.
